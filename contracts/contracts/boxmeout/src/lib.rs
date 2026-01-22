@@ -14,6 +14,7 @@ mod factory;
 mod market;
 mod oracle;
 mod treasury;
+pub mod helpers;
 
 // Export all contracts - needed for integration tests
 pub use amm::*;
@@ -21,6 +22,7 @@ pub use factory::*;
 pub use market::*;
 pub use oracle::*;
 pub use treasury::*;
+pub use helpers::*;
 
 // Type aliases for test compatibility
 pub use factory::MarketFactory as FactoryContract;
