@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use boxmeout::amm::{AMM, AMMClient};
+use boxmeout::amm::{AMMClient, AMM};
 use soroban_sdk::{
     testutils::{Address as _, Ledger, LedgerInfo},
     token, Address, BytesN, Env,
@@ -27,7 +27,10 @@ fn create_test_env() -> Env {
 }
 
 /// Create and register a mock USDC token
-fn create_usdc_token<'a>(env: &'a Env, admin: &Address) -> (token::StellarAssetClient<'a>, Address) {
+fn create_usdc_token<'a>(
+    env: &'a Env,
+    admin: &Address,
+) -> (token::StellarAssetClient<'a>, Address) {
     let token_address = env
         .register_stellar_asset_contract_v2(admin.clone())
         .address();
@@ -36,7 +39,16 @@ fn create_usdc_token<'a>(env: &'a Env, admin: &Address) -> (token::StellarAssetC
 }
 
 /// Setup AMM contract with initialized state
-fn setup_amm(env: &Env) -> (AMMClient, Address, Address, Address, token::StellarAssetClient, Address) {
+fn setup_amm(
+    env: &Env,
+) -> (
+    AMMClient,
+    Address,
+    Address,
+    Address,
+    token::StellarAssetClient,
+    Address,
+) {
     let amm_contract = env.register_contract(None, AMM);
     let client = AMMClient::new(env, &amm_contract);
 
@@ -103,7 +115,7 @@ fn create_extreme_odds_pool(
     // To create 99:1 odds (favoring NO), we need to buy large amounts of NO shares
     // This will push the YES reserve very high and NO reserve very low
     // In CPMM: YES odds = no_reserve / total, so low NO reserve = low YES odds
-    
+
     // Buy NO shares with a large amount to push odds to extreme
     // We'll buy approximately 48% of the pool's value in NO shares
     let buy_amount = (total_liquidity * 48) / 100;
@@ -145,19 +157,31 @@ fn test_buy_at_extreme_odds_99_1_slippage_protection() {
 
     // Create pool with 1M USDC initial liquidity and trade to extreme odds
     let initial_liquidity = 1_000_000_000_000u128; // 1M USDC (6 decimals)
-    
+
     // Trade to create extreme 99:1 odds (favoring NO) - this will create the pool
-    let (yes_reserve, no_reserve) =
-        create_extreme_odds_pool(&env, &client, &token, &market_id, &creator, initial_liquidity, 99, false);
+    let (yes_reserve, no_reserve) = create_extreme_odds_pool(
+        &env,
+        &client,
+        &token,
+        &market_id,
+        &creator,
+        initial_liquidity,
+        99,
+        false,
+    );
 
     // Verify we have extreme odds
     let (_yes_odds, no_odds) = client.get_odds(&market_id);
-    assert!(no_odds > 9800, "Expected NO odds > 98%, got {} bps", no_odds);
+    assert!(
+        no_odds > 9800,
+        "Expected NO odds > 98%, got {} bps",
+        no_odds
+    );
 
     // Now try to buy YES shares (the unfavored outcome) with strict slippage protection
     let buy_amount = 100_000_000u128; // 100 USDC
     let expected_shares = (buy_amount * yes_reserve) / (no_reserve + buy_amount);
-    
+
     // Set min_shares to be higher than what we'll actually get (should trigger slippage protection)
     let min_shares = expected_shares + 1;
 
@@ -186,10 +210,18 @@ fn test_buy_at_extreme_odds_99_1_succeeds_with_acceptable_slippage() {
 
     // Create pool with 1M USDC initial liquidity and trade to extreme odds
     let initial_liquidity = 1_000_000_000_000u128;
-    
+
     // Trade to create extreme 99:1 odds - this will create the pool
-    let (_yes_reserve, _no_reserve) =
-        create_extreme_odds_pool(&env, &client, &token, &market_id, &creator, initial_liquidity, 99, false);
+    let (_yes_reserve, _no_reserve) = create_extreme_odds_pool(
+        &env,
+        &client,
+        &token,
+        &market_id,
+        &creator,
+        initial_liquidity,
+        99,
+        false,
+    );
 
     // Verify extreme odds
     let (_yes_odds, no_odds) = client.get_odds(&market_id);
@@ -210,8 +242,11 @@ fn test_buy_at_extreme_odds_99_1_succeeds_with_acceptable_slippage() {
 
     // This should succeed
     let shares_received = client.buy_shares(&buyer, &market_id, &1u32, &buy_amount, &min_shares);
-    assert!(shares_received > 0, "Should receive some shares even at extreme odds");
-    
+    assert!(
+        shares_received > 0,
+        "Should receive some shares even at extreme odds"
+    );
+
     // Verify shares are much less than buy amount due to extreme odds
     assert!(
         shares_received < buy_amount / 10,
@@ -231,7 +266,14 @@ fn test_sell_shares_slippage_protection_triggers() {
 
     // Create pool
     let initial_liquidity = 1_000_000_000_000u128;
-    create_pool(&env, &client, &token, &market_id, &creator, initial_liquidity);
+    create_pool(
+        &env,
+        &client,
+        &token,
+        &market_id,
+        &creator,
+        initial_liquidity,
+    );
 
     // First, buy some shares
     let buy_amount = 100_000_000u128;
@@ -279,7 +321,14 @@ fn test_sell_shares_slippage_protection_accepts_valid_trade() {
 
     // Create pool
     let initial_liquidity = 1_000_000_000_000u128;
-    create_pool(&env, &client, &token, &market_id, &creator, initial_liquidity);
+    create_pool(
+        &env,
+        &client,
+        &token,
+        &market_id,
+        &creator,
+        initial_liquidity,
+    );
 
     // Buy shares
     let buy_amount = 100_000_000u128;
@@ -299,7 +348,10 @@ fn test_sell_shares_slippage_protection_accepts_valid_trade() {
     let payout = client.sell_shares(&seller, &market_id, &1u32, &shares_bought, &min_payout);
 
     assert!(payout > 0, "Should receive payout when selling shares");
-    assert!(payout < buy_amount, "Payout should be less than buy amount due to fees");
+    assert!(
+        payout < buy_amount,
+        "Payout should be less than buy amount due to fees"
+    );
 }
 
 #[test]
@@ -313,7 +365,14 @@ fn test_remove_all_liquidity_fails() {
 
     // Create pool
     let initial_liquidity = 1_000_000_000_000u128;
-    create_pool(&env, &client, &token, &market_id, &creator, initial_liquidity);
+    create_pool(
+        &env,
+        &client,
+        &token,
+        &market_id,
+        &creator,
+        initial_liquidity,
+    );
 
     // Get LP token balance by trying to remove a small amount first to get the balance
     // We'll use a helper to get the balance, or we can infer it from the initial liquidity
@@ -334,7 +393,14 @@ fn test_remove_almost_all_liquidity_succeeds() {
 
     // Create pool
     let initial_liquidity = 1_000_000_000_000u128;
-    create_pool(&env, &client, &token, &market_id, &creator, initial_liquidity);
+    create_pool(
+        &env,
+        &client,
+        &token,
+        &market_id,
+        &creator,
+        initial_liquidity,
+    );
 
     // Get LP token balance (creator receives LP tokens equal to initial liquidity)
     let lp_balance = initial_liquidity;
@@ -365,7 +431,14 @@ fn test_buy_shares_with_zero_reserves() {
 
     // Create pool
     let initial_liquidity = 1_000_000_000_000u128;
-    create_pool(&env, &client, &token, &market_id, &creator, initial_liquidity);
+    create_pool(
+        &env,
+        &client,
+        &token,
+        &market_id,
+        &creator,
+        initial_liquidity,
+    );
 
     // Remove most liquidity to create a low-liquidity scenario
     let lp_balance = initial_liquidity; // Creator receives LP tokens equal to initial liquidity
@@ -386,7 +459,7 @@ fn test_buy_shares_with_zero_reserves() {
     // This might succeed if there's still minimal liquidity, or fail if protection triggers
     // The key is that the contract should handle this gracefully
     let (yes_reserve, no_reserve, _, _, _) = client.get_pool_state(&market_id);
-    
+
     // If reserves are zero, this should panic
     if yes_reserve == 0 || no_reserve == 0 {
         client.buy_shares(&buyer, &market_id, &1u32, &buy_amount, &0u128);
@@ -405,7 +478,14 @@ fn test_buy_shares_zero_amount_division_protection() {
 
     // Create pool
     let initial_liquidity = 1_000_000_000_000u128;
-    create_pool(&env, &client, &token, &market_id, &creator, initial_liquidity);
+    create_pool(
+        &env,
+        &client,
+        &token,
+        &market_id,
+        &creator,
+        initial_liquidity,
+    );
 
     // Try to buy with zero amount (should panic before any division)
     token.mint(&buyer, &(100_000_000i128));
@@ -432,7 +512,14 @@ fn test_sell_shares_zero_shares_division_protection() {
 
     // Create pool
     let initial_liquidity = 1_000_000_000_000u128;
-    create_pool(&env, &client, &token, &market_id, &creator, initial_liquidity);
+    create_pool(
+        &env,
+        &client,
+        &token,
+        &market_id,
+        &creator,
+        initial_liquidity,
+    );
 
     // Try to sell zero shares (should panic before any division)
     client.sell_shares(&seller, &market_id, &1u32, &0u128, &0u128);
@@ -447,7 +534,10 @@ fn test_get_odds_handles_zero_liquidity() {
 
     // Get odds for non-existent pool (should return 50/50)
     let (yes_odds, no_odds) = client.get_odds(&market_id);
-    assert_eq!(yes_odds, 5000, "Non-existent pool should return 50% YES odds");
+    assert_eq!(
+        yes_odds, 5000,
+        "Non-existent pool should return 50% YES odds"
+    );
     assert_eq!(no_odds, 5000, "Non-existent pool should return 50% NO odds");
 }
 
@@ -463,11 +553,18 @@ fn test_overflow_protection_large_amounts() {
     // Create pool with large but reasonable initial liquidity
     // Using a large value to test that the contract handles large numbers correctly
     let initial_liquidity = 1_000_000_000_000_000_000u128; // 1B USDC (with 6 decimals = 1 trillion)
-    create_pool(&env, &client, &token, &market_id, &creator, initial_liquidity);
+    create_pool(
+        &env,
+        &client,
+        &token,
+        &market_id,
+        &creator,
+        initial_liquidity,
+    );
 
     // Try to buy with large amount (but not so large as to cause overflow in calculations)
     let buy_amount = 100_000_000_000_000_000u128; // 100M USDC
-    
+
     // The contract should handle large amounts correctly
     // With overflow-checks enabled in Cargo.toml, Rust will panic on overflow
     // This test verifies the contract can handle large but reasonable values
@@ -482,7 +579,10 @@ fn test_overflow_protection_large_amounts() {
 
     // This should succeed with large amounts (overflow protection is handled by Rust's checked arithmetic)
     let shares = client.buy_shares(&buyer, &market_id, &1u32, &buy_amount, &0u128);
-    assert!(shares > 0, "Should receive shares when buying with large amount");
+    assert!(
+        shares > 0,
+        "Should receive shares when buying with large amount"
+    );
 }
 
 #[test]
@@ -495,7 +595,14 @@ fn test_remove_liquidity_division_by_zero_protection() {
 
     // Create pool
     let initial_liquidity = 1_000_000_000_000u128;
-    create_pool(&env, &client, &token, &market_id, &creator, initial_liquidity);
+    create_pool(
+        &env,
+        &client,
+        &token,
+        &market_id,
+        &creator,
+        initial_liquidity,
+    );
 
     // LP supply is not needed for this test
 
@@ -519,7 +626,14 @@ fn test_buy_shares_invariant_protection() {
 
     // Create pool
     let initial_liquidity = 1_000_000_000_000u128;
-    create_pool(&env, &client, &token, &market_id, &creator, initial_liquidity);
+    create_pool(
+        &env,
+        &client,
+        &token,
+        &market_id,
+        &creator,
+        initial_liquidity,
+    );
 
     // Get initial state
     let (initial_yes, initial_no, _, _, _) = client.get_pool_state(&market_id);
@@ -541,7 +655,7 @@ fn test_buy_shares_invariant_protection() {
     // Verify invariant: k should increase (due to fees) or stay same, never decrease
     let (new_yes, new_no, _, _, _) = client.get_pool_state(&market_id);
     let new_k = new_yes * new_no;
-    
+
     assert!(
         new_k >= initial_k,
         "Invariant k should never decrease (initial_k: {}, new_k: {})",
@@ -561,7 +675,14 @@ fn test_sell_shares_reserves_remain_positive() {
 
     // Create pool
     let initial_liquidity = 1_000_000_000_000u128;
-    create_pool(&env, &client, &token, &market_id, &creator, initial_liquidity);
+    create_pool(
+        &env,
+        &client,
+        &token,
+        &market_id,
+        &creator,
+        initial_liquidity,
+    );
 
     // Buy shares
     let buy_amount = 100_000_000u128;
@@ -584,7 +705,10 @@ fn test_sell_shares_reserves_remain_positive() {
 
     // Verify reserves remain positive
     let (yes_after, no_after, _, _, _) = client.get_pool_state(&market_id);
-    
-    assert!(yes_after > 0, "YES reserve should remain positive after sell");
+
+    assert!(
+        yes_after > 0,
+        "YES reserve should remain positive after sell"
+    );
     assert!(no_after > 0, "NO reserve should remain positive after sell");
 }

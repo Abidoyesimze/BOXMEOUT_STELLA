@@ -265,29 +265,30 @@ impl AMM {
         let amount_after_fee = amount - fee_amount;
 
         // CPMM calculation: shares_out = (amount_in * reserve_out) / (reserve_in + amount_in)
-        let (reserve_in, reserve_out, new_reserve_in, new_reserve_out, shares_out) = if outcome == 1 {
-            // Buying YES shares: pay with USDC, get YES shares
-            // Input reserve is NO (what we're paying with conceptually in CPMM mapping)
-            // Output reserve is YES (what we're getting)
-            let shares_out = (amount_after_fee * yes_reserve) / (no_reserve + amount_after_fee);
-            (
-                no_reserve,
-                yes_reserve,
-                no_reserve + amount_after_fee,
-                yes_reserve - shares_out,
-                shares_out,
-            )
-        } else {
-            // Buying NO shares: pay with USDC, get NO shares
-            let shares_out = (amount_after_fee * no_reserve) / (yes_reserve + amount_after_fee);
-            (
-                yes_reserve,
-                no_reserve,
-                yes_reserve + amount_after_fee,
-                no_reserve - shares_out,
-                shares_out,
-            )
-        };
+        let (_reserve_in, _reserve_out, new_reserve_in, new_reserve_out, shares_out) =
+            if outcome == 1 {
+                // Buying YES shares: pay with USDC, get YES shares
+                // Input reserve is NO (what we're paying with conceptually in CPMM mapping)
+                // Output reserve is YES (what we're getting)
+                let shares_out = (amount_after_fee * yes_reserve) / (no_reserve + amount_after_fee);
+                (
+                    no_reserve,
+                    yes_reserve,
+                    no_reserve + amount_after_fee,
+                    yes_reserve - shares_out,
+                    shares_out,
+                )
+            } else {
+                // Buying NO shares: pay with USDC, get NO shares
+                let shares_out = (amount_after_fee * no_reserve) / (yes_reserve + amount_after_fee);
+                (
+                    yes_reserve,
+                    no_reserve,
+                    yes_reserve + amount_after_fee,
+                    no_reserve - shares_out,
+                    shares_out,
+                )
+            };
 
         // Slippage protection
         if shares_out < min_shares {
